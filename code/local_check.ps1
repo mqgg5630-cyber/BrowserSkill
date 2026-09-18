@@ -174,9 +174,32 @@ if (Test-Path -LiteralPath $bskRunner) {
         Write-Output '== browser round: no results\status\browser_task.json - skipped'
     } else {
         Write-Output '== browser round: running code\bsk_arena_chat.ps1 (drives this machine''s browser)'
+        # Resolve the host EXE by absolute path. A bare "powershell" in a
+        # pipeline made PS 5.1 answer "cannot run a document in the middle of a
+        # pipeline" on LAPTOP-R77M5D6M (round 1, 2026-09-18): the name resolved
+        # to something that is not an application.
+        $psExe = ''
+        foreach ($cand in @(
+            (Join-Path $PSHOME 'powershell.exe'),
+            (Join-Path $PSHOME 'pwsh.exe'),
+            (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'))) {
+            if ($cand -and (Test-Path -LiteralPath $cand)) { $psExe = $cand; break }
+        }
+        if (-not $psExe) {
+            $g = Get-Command powershell.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($g -and $g.Source) { $psExe = [string]$g.Source }
+        }
         try {
-            $bskOut = (& powershell -NoProfile -ExecutionPolicy Bypass -File $bskRunner 2>&1 | Out-String)
-            $bskCode = $LASTEXITCODE
+            if ($psExe) {
+                $bskOut = (& $psExe -NoProfile -ExecutionPolicy Bypass -File $bskRunner 2>&1 | Out-String)
+                $bskCode = $LASTEXITCODE
+            } else {
+                # last resort: run it in this process (same verdict, no child)
+                Write-Output '   (no powershell.exe resolved - running the round in-process)'
+                $bskOut = (& $bskRunner 2>&1 | Out-String)
+                $bskCode = $LASTEXITCODE
+            }
+            if ($null -eq $bskCode) { $bskCode = 1 }
             if ($bskOut.Trim()) { Write-Output $bskOut.TrimEnd() }
             if ($bskCode -eq 0) {
                 Write-Output '== accept 3: BrowserSkill round PASSED on this machine'
