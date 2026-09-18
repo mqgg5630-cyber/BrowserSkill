@@ -1,0 +1,64 @@
+check round 1 on LAPTOP-R77M5D6M - passed (exit 0)
+cmd: powershell -NoProfile -ExecutionPolicy Bypass -File code/local_check.ps1
+elapsed: 16s
+
+NOTE: non-ASCII allowed in ./install.ps1 (repo-owned file - see the ASCII_ALLOWLIST comment above)
+NOTE: non-ASCII allowed in ./scripts/install-windows.test.ps1 (repo-owned file - see the ASCII_ALLOWLIST comment above)
+OK: all .ps1 files are ASCII-only
+OK: sync.config.json branch=arena/01a0b352-browserskill
+OK: sync.config.json branch matches HEAD (arena/01a0b352-browserskill)
+NOTE: root install.ps1 belongs to THIS repo - the skill copy stays at skills/git-sync/scripts/install.ps1 (run it by full path)
+OK: root scripts identical to skills/git-sync/scripts
+OK: no drive-style variable typos ($var:)
+== exits in Invoke-PollRound: 6
+OK: every exit path sets its closing summary
+== exits in Invoke-PollOnce: 2 (lock held / crashed / normal)
+OK: loop closing lines covered (6 exit paths, all with their own summary)
+OK: every .ps1 parses
+   (gate ran via E:\hermes\git\bin\bash.exe [git])
+== accept 2a: silent push PROVEN (ls-remote + push --dry-run, prompts disabled)
+== auth: this clone is PINNED to gh account 'mqgg5630-cyber' (other clones use the machine default)
+== accept 2b (fallback): one LONG-LIVED loop process - one brief flash per logon,
+   not per poll. For zero flash: admin PowerShell -> .\watch.ps1 -Unregister ;
+   .\watch.ps1 -Register -Headless   (or fix the launcher, see watch-*.log)
+== exits in Invoke-PollRound: 6
+OK: every exit path sets its closing summary
+== exits in Invoke-PollOnce: 2 (lock held / crashed / normal)
+OK: loop closing lines covered (6 exit paths, all with their own summary)
+== check_loop_summary PASSED
+== accept 2c: watcher closing lines verified (every exit path has its summary)
+== accept 2d: hands-free auto_pull/auto_push present in watch.ps1
+== success criteria: results/status/success_criteria.json
+   Round 1 - local <-> arena bridge only: the git-sync skill is installed in this repo, the branch guard points at this session's branch, and the repo-owned files it collided with are documented. Every entry here must already be true WHEN the local watcher runs its check, so nothing depends on that round's own output (the round trip itself is proven by results/status/handshake.json + check_rN_*.txt, which agent-check.sh --read evaluates). No business task is in scope for round 1.
+   OK   exists: sync.ps1 (8476 B)
+   OK   exists: push.ps1 (14410 B)
+   OK   exists: upload.ps1 (5727 B)
+   OK   exists: download.ps1 (6849 B)
+   OK   exists: pack.ps1 (4377 B)
+   OK   exists: doctor.ps1 (15683 B)
+   OK   exists: bootstrap.ps1 (5765 B)
+   OK   exists: pr.ps1 (4376 B)
+   OK   exists: hardware.ps1 (11831 B)
+   OK   exists: watch.ps1 (84094 B)
+   OK   exists: auth.ps1 (48030 B)
+   OK   exists: skills/git-sync/VERSION (7 B)
+   OK   exists: skills/git-sync/sync.config.json (1183 B)
+   OK   exists: skills/git-sync/scripts/install.ps1 (6943 B)
+   OK   exists: code/check_all.sh (12282 B)
+   OK   exists: code/local_check.ps1 (14800 B)
+   OK   exists: code/check_loop_summary.ps1 (4871 B)
+   OK   exists: code/check_loop_summary.py (5502 B)
+   OK   exists: code/scan_ps_var_colon.py (1596 B)
+   OK   exists: code/GIT_SYNC_NOTES.md (5944 B)
+   OK   exists: install.ps1 (11197 B)
+   OK   absent: local/inbox
+   OK   contains skills/git-sync/VERSION <- 2.9.2
+   OK   contains skills/git-sync/sync.config.json <- "branch": "arena/01a0b352-browserskill"
+   OK   contains code/GIT_SYNC_NOTES.md <- git checkout -- install.ps1
+   OK   regex skills/git-sync/sync.config.json
+   OK   regex install.ps1
+   OK   size watch.ps1: 84094 >= 20000
+   OK   size auth.ps1: 48030 >= 20000
+   OK   size code/local_check.ps1: 14800 >= 5000
+   OK   size install.ps1: 11197 >= 8000
+== local checks passed

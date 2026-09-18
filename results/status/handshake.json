@@ -1,9 +1,9 @@
 {
-  "round": 1,
-  "arena_state": "awaiting_check",
-  "local_state": "pending",
-  "arena_updated": "2026-09-18 07:13:19",
-  "local_updated": null,
-  "host": "",
-  "note": "round 1 (bridge only): run code/local_check.ps1 on the real machine - gate + silent push + watcher; no other task in scope"
+    "round":  1,
+    "arena_state":  "awaiting_check",
+    "local_state":  "passed",
+    "arena_updated":  "2026-09-18 07:13:19",
+    "local_updated":  "2026-09-18 15:18:27",
+    "host":  "LAPTOP-R77M5D6M",
+    "note":  "round 1 (bridge only): run code/local_check.ps1 on the real machine - gate + silent push + watcher; no other task in scope"
 }
