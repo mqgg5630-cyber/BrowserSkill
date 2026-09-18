@@ -1,0 +1,49 @@
+{
+  "round": 2,
+  "branch": "arena/01a0b3c5-browserskill",
+  "status": "passed",
+  "timestamp_utc": "2026-09-18 09:09:13 UTC",
+  "local_sha": "97c905fe1ebde6b225fd1b24a54dc2b9fb477120",
+  "checks": [
+    {
+      "name": "docx exists",
+      "ok": true,
+      "detail": "deliverables/round-2/report-round-2.docx size=37832"
+    },
+    {
+      "name": "pptx exists",
+      "ok": true,
+      "detail": "deliverables/round-2/report-round-2.pptx size=32478"
+    },
+    {
+      "name": "meta.json valid",
+      "ok": true,
+      "detail": "round=2 ts=2026-09-18 09:09:10 UTC"
+    },
+    {
+      "name": "docx content (轮次/时间戳/上轮状态)",
+      "ok": true,
+      "detail": "all present"
+    },
+    {
+      "name": "pptx content (轮次/时间戳/上轮状态)",
+      "ok": true,
+      "detail": "all present, slides=5"
+    },
+    {
+      "name": "docx zip integrity",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "pptx zip integrity",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "pushed to branch",
+      "ok": true,
+      "detail": "local=97c905fe1ebd remote=97c905fe1ebde6b225fd1b24a54dc2b9fb477120\trefs/heads/arena/01"
+    }
+  ]
+}
