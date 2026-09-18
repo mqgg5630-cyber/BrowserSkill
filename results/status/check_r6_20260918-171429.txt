@@ -1,0 +1,60 @@
+check round 6 on LAPTOP-R77M5D6M - failed (exit 1)
+cmd: powershell -NoProfile -ExecutionPolicy Bypass -File code/local_check.ps1
+elapsed: 125s
+
+OK: all .ps1 files are ASCII-only
+OK: sync.config.json branch=arena/01a0b25b-browserskill
+OK: sync.config.json branch matches HEAD (arena/01a0b25b-browserskill)
+OK: root scripts identical to skills/git-sync/scripts
+OK: no drive-style variable typos ($var:)
+== exits in Invoke-PollRound: 6
+OK: every exit path sets its closing summary
+== exits in Invoke-PollOnce: 2 (lock held / crashed / normal)
+OK: loop closing lines covered (6 exit paths, all with their own summary)
+OK: every .ps1 parses
+   (gate ran via E:\hermes\git\bin\bash.exe [git])
+== accept 2a: silent push PROVEN (ls-remote + push --dry-run, prompts disabled)
+== auth: this clone is PINNED to gh account 'mqgg5630-cyber' (other clones use the machine default)
+== accept 2b (fallback): one LONG-LIVED loop process - one brief flash per logon,
+   not per poll. For zero flash: admin PowerShell -> .\watch.ps1 -Unregister ;
+   .\watch.ps1 -Register -Headless   (or fix the launcher, see watch-*.log)
+== exits in Invoke-PollRound: 6
+OK: every exit path sets its closing summary
+== exits in Invoke-PollOnce: 2 (lock held / crashed / normal)
+OK: loop closing lines covered (6 exit paths, all with their own summary)
+== check_loop_summary PASSED
+== accept 2c: watcher closing lines verified (every exit path has its summary)
+== browser round: running code\bsk_arena_chat.ps1 (drives this machine's browser)
+== browser round (BrowserSkill)
+   task      : results/status/browser_task.json
+   url       : https://arena.ai/agent/01a0b237-fad1-7168-8115-d3f52e550489
+   send      : 168 chars
+   evidence  : deliverable\browser-loop
+   bsk       : C:\Users\文少\.local\bin\bsk.exe
+== daemon ok: v0.3.0 protocol 1.3, ws_port 52800, browsers 1
+   browser   :  (460c6016)
+== session   : lnkh
+   - borrow user tab: no match (falling back to a new tab)
+   - navigate: ok (https://arena.ai/agent/01a0b237-fad1-7168-8115-d3f52e550489)
+   - wait for the app to render: no input yet (91s, 0 chars)
+   - hard reload: FAILED (the chat did not load the first time)
+   - fallback url: FAILED (https://arena.ai/)
+   - observe (before): FAILED (empty observation)
+[FAIL] browser round: observe returned nothing - the page may not be controllable
+   - session stop: FAILED (lnkh)
+== round elapsed: 99s (budget 600s)
+[FAIL] browser round did not reach its goal - see deliverable\browser-loop\transcript.md
+[FAIL] accept 3: BrowserSkill round failed (exit 1)
+== accept 2d: hands-free auto_pull/auto_push present in watch.ps1
+== success criteria: results/status/success_criteria.json
+   BrowserSkill self-loop: the round only counts when the USER'S machine really drove its browser through bsk and produced evidence. The sandbox cannot fake these - result.json is written by code/bsk_arena_chat.ps1 on the Windows host.
+   OK   exists: deliverable/browser-loop/result.json (2398 B)
+   OK   exists: deliverable/browser-loop/transcript.md (1003 B)
+   OK   exists: deliverable/browser-loop/observe_before.txt (3212 B)
+   FAIL MISSING file: deliverable/browser-loop/observe_after.txt
+   OK   exists: deliverable/browser-loop/page.png (52166 B)
+   OK   contains deliverable/browser-loop/result.json <- arena.ai
+   FAIL regex in deliverable/browser-loop/result.json: "ok"\s*:\s*true
+   FAIL regex in deliverable/browser-loop/transcript.md: session stop: ok
+   OK   size deliverable/browser-loop/result.json: 2398 >= 300
+   OK   size deliverable/browser-loop/page.png: 52166 >= 5000
