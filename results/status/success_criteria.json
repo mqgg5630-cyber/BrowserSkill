@@ -1,5 +1,5 @@
 {
-  "description": "Round 1 - local <-> arena bridge (打通): the git-sync skill is installed in this repo, the branch guard points at this session's branch, and the user's Windows machine has completed one watcher round and pushed its verdict back. Nothing else is in scope for round 1.",
+  "description": "Round 1 - local <-> arena bridge only: the git-sync skill is installed in this repo, the branch guard points at this session's branch, and the repo-owned files it collided with are documented. Every entry here must already be true WHEN the local watcher runs its check, so nothing depends on that round's own output (the round trip itself is proven by results/status/handshake.json + check_rN_*.txt, which agent-check.sh --read evaluates). No business task is in scope for round 1.",
   "require_files": [
     "sync.ps1",
     "push.ps1",
@@ -20,8 +20,8 @@
     "code/check_loop_summary.ps1",
     "code/check_loop_summary.py",
     "code/scan_ps_var_colon.py",
-    "results/status/handshake.json",
-    "results/status/check_r1_*"
+    "code/GIT_SYNC_NOTES.md",
+    "install.ps1"
   ],
   "forbid_files": [
     "local/inbox"
@@ -29,15 +29,16 @@
   "require_contains": {
     "skills/git-sync/VERSION": "2.9.2",
     "skills/git-sync/sync.config.json": "\"branch\": \"arena/01a0b352-browserskill\"",
-    "code/GIT_SYNC_NOTES.md": "install.ps1"
+    "code/GIT_SYNC_NOTES.md": "git checkout -- install.ps1"
   },
   "require_regex": {
-    "results/status/handshake.json": "\"local_state\"\\s*:\\s*\"passed\"",
-    "skills/git-sync/sync.config.json": "\"hands_free\"\\s*:\\s*true"
+    "skills/git-sync/sync.config.json": "\"hands_free\"\\s*:\\s*true",
+    "install.ps1": "bsk"
   },
   "min_bytes": {
     "watch.ps1": 20000,
     "auth.ps1": 20000,
-    "code/local_check.ps1": 5000
+    "code/local_check.ps1": 5000,
+    "install.ps1": 8000
   }
 }
