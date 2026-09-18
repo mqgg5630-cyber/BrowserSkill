@@ -1,0 +1,13 @@
+{
+  "_comment": "Task for code/bsk_arena_chat.ps1, executed BY THE WATCHER on the user's Windows machine. The Arena sandbox cannot run it: bsk + the browser extension only exist there. Edit this file from the sandbox to change the round; .ps1 files must stay ASCII-only, so all free text lives here.",
+  "enabled": true,
+  "url": "https://arena.ai/agent/01a0b237-fad1-7168-8115-d3f52e550489",
+  "message": "BrowserSkill self-loop round 1: this message was typed by the bsk CLI driving the real browser (not by a human). Please reply with the single line: BROWSERSKILL-LOOP-OK",
+  "composer_hint": "",
+  "send_key": "Enter",
+  "reply_timeout_sec": 240,
+  "settle_sec": 8,
+  "require_reply": true,
+  "out_dir": "deliverable/browser-loop",
+  "borrow_tab_match": "arena\\.ai/agent/01a0b237"
+}

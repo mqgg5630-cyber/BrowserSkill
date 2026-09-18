@@ -162,10 +162,36 @@ if (Test-Path -LiteralPath $loopChk) {
     Write-Output '[WARN] accept 2c: code\check_loop_summary.ps1 is missing - skipped (upgrade the skill)'
 }
 
-# 3. example: the deliverable must exist and not be empty
-# if (-not (Test-Path '.\deliverable\final.pptx')) {
-#     Write-Host '[FAIL] deliverable\final.pptx missing' -ForegroundColor Red; $fail = 1
-# }
+# 3. BrowserSkill round: drive the REAL browser on this machine through bsk.
+#    The task (url / message / timeouts) lives in
+#    results/status/browser_task.json so the agent can change it from the
+#    sandbox without touching any .ps1 (they must stay ASCII-only). No task
+#    file, or "enabled": false -> the section skips and the round still passes.
+$bskRunner = '.\code\bsk_arena_chat.ps1'
+$bskTask   = '.\results\status\browser_task.json'
+if (Test-Path -LiteralPath $bskRunner) {
+    if (-not (Test-Path -LiteralPath $bskTask)) {
+        Write-Output '== browser round: no results\status\browser_task.json - skipped'
+    } else {
+        Write-Output '== browser round: running code\bsk_arena_chat.ps1 (drives this machine''s browser)'
+        try {
+            $bskOut = (& powershell -NoProfile -ExecutionPolicy Bypass -File $bskRunner 2>&1 | Out-String)
+            $bskCode = $LASTEXITCODE
+            if ($bskOut.Trim()) { Write-Output $bskOut.TrimEnd() }
+            if ($bskCode -eq 0) {
+                Write-Output '== accept 3: BrowserSkill round PASSED on this machine'
+            } else {
+                Write-Output ('[FAIL] accept 3: BrowserSkill round failed (exit ' + $bskCode + ')')
+                $fail = 1
+            }
+        } catch {
+            Write-Output ('[FAIL] accept 3: bsk_arena_chat.ps1 threw: ' + $_.Exception.Message)
+            $fail = 1
+        }
+    }
+} else {
+    Write-Output '== browser round: code\bsk_arena_chat.ps1 not present - skipped'
+}
 
 # 4. add your own checks here ...
 

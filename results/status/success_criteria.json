@@ -1,0 +1,21 @@
+{
+  "description": "BrowserSkill self-loop: the round only counts when the USER'S machine really drove its browser through bsk and produced evidence. The sandbox cannot fake these - result.json is written by code/bsk_arena_chat.ps1 on the Windows host.",
+  "require_files": [
+    "deliverable/browser-loop/result.json",
+    "deliverable/browser-loop/transcript.md",
+    "deliverable/browser-loop/observe_before.txt",
+    "deliverable/browser-loop/observe_after.txt",
+    "deliverable/browser-loop/page.png"
+  ],
+  "require_regex": {
+    "deliverable/browser-loop/result.json": "\"ok\"\\s*:\\s*true",
+    "deliverable/browser-loop/transcript.md": "session stop: ok"
+  },
+  "require_contains": {
+    "deliverable/browser-loop/result.json": "arena.ai/agent/01a0b237"
+  },
+  "min_bytes": {
+    "deliverable/browser-loop/result.json": 300,
+    "deliverable/browser-loop/page.png": 5000
+  }
+}
