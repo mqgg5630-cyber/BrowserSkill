@@ -1,0 +1,40 @@
+# gate.yml (template) - run the "gate" from skills/git-sync/sync.config.json
+# on every push (main/master excluded), so a broken change is visible on
+# GitHub even before anyone pulls it.
+#
+# Install: copy this file to .github/workflows/gate.yml
+# (agent-install.sh --gha does it for you)
+#
+# Note: if your gate needs Python packages (python-docx, python-pptx, ...),
+# add a "pip install ..." step before the gate step.
+
+name: gate
+
+on:
+  push:
+    branches-ignore: [main, master]
+  workflow_dispatch:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'
+
+      - name: run the gate from sync.config.json
+        run: |
+          CFG=skills/git-sync/sync.config.json
+          if [ ! -f "$CFG" ]; then
+            echo "no sync.config.json - nothing to gate"
+            exit 0
+          fi
+          GATE="$(python3 -c "import json;print(json.load(open('$CFG',encoding='utf-8')).get('gate',''))")"
+          if [ -n "$GATE" ]; then
+            bash -c "$GATE"
+          else
+            echo "no gate configured in sync.config.json"
+          fi

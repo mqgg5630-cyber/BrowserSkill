@@ -1,0 +1,43 @@
+{
+  "description": "Round 1 - local <-> arena bridge (打通): the git-sync skill is installed in this repo, the branch guard points at this session's branch, and the user's Windows machine has completed one watcher round and pushed its verdict back. Nothing else is in scope for round 1.",
+  "require_files": [
+    "sync.ps1",
+    "push.ps1",
+    "upload.ps1",
+    "download.ps1",
+    "pack.ps1",
+    "doctor.ps1",
+    "bootstrap.ps1",
+    "pr.ps1",
+    "hardware.ps1",
+    "watch.ps1",
+    "auth.ps1",
+    "skills/git-sync/VERSION",
+    "skills/git-sync/sync.config.json",
+    "skills/git-sync/scripts/install.ps1",
+    "code/check_all.sh",
+    "code/local_check.ps1",
+    "code/check_loop_summary.ps1",
+    "code/check_loop_summary.py",
+    "code/scan_ps_var_colon.py",
+    "results/status/handshake.json",
+    "results/status/check_r1_*"
+  ],
+  "forbid_files": [
+    "local/inbox"
+  ],
+  "require_contains": {
+    "skills/git-sync/VERSION": "2.9.2",
+    "skills/git-sync/sync.config.json": "\"branch\": \"arena/01a0b352-browserskill\"",
+    "code/GIT_SYNC_NOTES.md": "install.ps1"
+  },
+  "require_regex": {
+    "results/status/handshake.json": "\"local_state\"\\s*:\\s*\"passed\"",
+    "skills/git-sync/sync.config.json": "\"hands_free\"\\s*:\\s*true"
+  },
+  "min_bytes": {
+    "watch.ps1": 20000,
+    "auth.ps1": 20000,
+    "code/local_check.ps1": 5000
+  }
+}

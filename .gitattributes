@@ -1,0 +1,13 @@
+# git-sync bridge: these files are executed by bash / PowerShell on the user's
+# Windows machine as well as in the agent sandbox.
+#
+# With core.autocrlf=true (the usual Windows default) a CRLF checkout breaks
+# `bash code/check_all.sh` ("$'\r': command not found") and makes the gate's
+# byte-for-byte "root .ps1 == skills/git-sync/scripts/.ps1" comparison fail for
+# no real reason. Pinning LF keeps both sides identical; Windows PowerShell 5.1
+# parses LF-only .ps1 files fine.
+#
+# Scope is deliberately narrow (.sh / .ps1 only) - nothing else in this repo is
+# renormalised.
+*.sh  text eol=lf
+*.ps1 text eol=lf
