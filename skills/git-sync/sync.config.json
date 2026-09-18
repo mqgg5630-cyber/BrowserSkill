@@ -1,0 +1,47 @@
+{
+  "branch": "arena/01a0b25b-browserskill",
+  "remote": "origin",
+  "download_dir": "",
+  "download_sets": {
+    "final": [
+      "deliverable"
+    ]
+  },
+  "upload_map": {
+    ".docx": "sources",
+    ".doc": "sources",
+    ".pptx": "sources",
+    ".ppt": "sources",
+    ".pdf": "sources",
+    ".md": "sources",
+    ".txt": "sources",
+    ".zip": "sources",
+    ".py": "code",
+    ".ipynb": "code",
+    ".xlsx": "results",
+    ".xls": "results",
+    ".csv": "results"
+  },
+  "gate": "bash code/check_all.sh",
+  "receipt": "results/sync/last_sync.md",
+  "receipt_history": "results/sync/history",
+  "hardware_dir": "results/hardware",
+  "handshake": "results/status/handshake.json",
+  "check_cmd": "powershell -NoProfile -ExecutionPolicy Bypass -File code/local_check.ps1",
+  "check_timeout_min": 30,
+  "lock_stale_min": 45,
+  "hands_free": true,
+  "auto_pull": true,
+  "auto_push": true,
+  "auto_push_prefix": "local: auto",
+  "auto_push_exclude": [
+    ".env",
+    ".env.*",
+    "**/*.pem",
+    "**/*.key",
+    "**/credentials*",
+    "**/*secret*",
+    "**/*token*"
+  ],
+  "success_criteria": "results/status/success_criteria.json"
+}

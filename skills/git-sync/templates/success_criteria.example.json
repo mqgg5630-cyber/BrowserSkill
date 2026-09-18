@@ -1,0 +1,12 @@
+{
+  "description": "Example success_criteria.json - copy to results/status/success_criteria.json and edit.",
+  "require_files": [
+    "deliverable/README.md"
+  ],
+  "require_contains": {
+    "deliverable/README.md": "done"
+  },
+  "min_bytes": {
+    "deliverable/README.md": 20
+  }
+}

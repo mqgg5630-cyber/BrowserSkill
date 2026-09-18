@@ -1,0 +1,104 @@
+# health.yml (template) - daily sync-health check on GitHub Actions.
+#
+# What it does (daily, server-side, no local machine needed):
+#   1. reads the handshake on the working branch - if a check request has been
+#      sitting in awaiting_check for a long time (watcher dead?), complain
+#   2. reads results/hardware/latest.json - if the report is older than 30
+#      days, remind the user to re-run .\hardware.ps1 -Deep
+#   3. opens (or comments on) an issue titled "sync-health: attention needed"
+#
+# IMPORTANT - scheduled workflows only run on the DEFAULT branch:
+#   * this file must be committed to the default branch (main), not the arena/*
+#     working branch
+#   * set BRANCH below to the working branch you want watched
+#   * NOTE: skills\git-sync\ does NOT exist on main (it lives on the working
+#     branch) - pull the template out of the working branch instead of copy:
+#
+# Enable it from your LOCAL clone (agent tokens usually lack the workflows
+# permission, yours does not):
+#   git checkout main
+#   mkdir -Force .github\workflows
+#   git checkout <working-branch> -- skills/git-sync/templates/health.yml .gitignore
+#   Copy-Item skills\git-sync\templates\health.yml .github\workflows\health.yml -Force
+#   git rm -r -f --quiet skills   # (-f is required: staged changes block a plain
+#                                  #  rm; the template content now lives in the
+#                                  #  workflow file, the stray dir must not stay)
+#   notepad .github\workflows\health.yml        # set BRANCH, save
+#   git add -A; git commit -m "ci: sync-health"; git push origin main
+#   git checkout <working branch>               # back to work
+#
+#   (the .gitignore from the working branch also protects main from sweeping
+#    untracked working files into future commits)
+
+name: sync-health
+
+on:
+  push:
+    branches: [main]        # auto-run once when the workflow itself changes
+  schedule:
+    - cron: '23 3 * * *'   # daily 03:23 UTC
+  workflow_dispatch:        # also runnable by hand from the Actions tab
+
+env:
+  BRANCH: arena/01a0a821-git-pull-arena   # <-- EDIT: the branch to watch
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: check handshake + hardware freshness
+        id: chk
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          import json, subprocess, sys, datetime, os
+          br = os.environ['BRANCH']
+          def show(p):
+              r = subprocess.run(['git', 'show', f'origin/{br}:{p}'],
+                                 capture_output=True, text=True)
+              return r.stdout if r.returncode == 0 else None
+          msgs = []
+          hs = show('results/status/handshake.json')
+          if hs:
+              d = json.loads(hs)
+              if d.get('arena_state') == 'awaiting_check':
+                  msgs.append('handshake stuck: round %s awaiting_check since %s '
+                              '(watcher offline? run .\\watch.ps1 on the local machine)'
+                              % (d.get('round'), d.get('arena_updated')))
+          hw = show('results/hardware/latest.json')
+          if hw:
+              d = json.loads(hw)
+              try:
+                  age = (datetime.datetime.now()
+                         - datetime.datetime.strptime(d.get('generated', ''), '%Y-%m-%d %H:%M:%S')).days
+                  if age > 30:
+                      msgs.append('hardware report is %d days old - re-run .\\hardware.ps1 -Deep' % age)
+              except ValueError:
+                  pass
+          if msgs:
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('messages<<EOF\n' + '\n'.join(msgs) + '\nEOF\n')
+              sys.exit(1)
+          print('healthy')
+          PY
+
+      - name: open or update the reminder issue
+        if: steps.chk.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE='sync-health: attention needed'
+          NUM=$(gh issue list --state open --search "in:title $TITLE" --json number --jq '.[0].number')
+          if [ -n "$NUM" ] && [ "$NUM" != "null" ]; then
+            gh issue comment "$NUM" --body "${{ steps.chk.outputs.messages }}"
+          else
+            gh issue create --title "$TITLE" --body "${{ steps.chk.outputs.messages }}"
+          fi
