@@ -1,0 +1,48 @@
+check round 2 on LAPTOP-R77M5D6M - failed (exit 1)
+cmd: powershell -NoProfile -ExecutionPolicy Bypass -File code/local_check.ps1
+elapsed: 19s
+
+OK: all .ps1 files are ASCII-only
+OK: sync.config.json branch=arena/01a0b25b-browserskill
+OK: sync.config.json branch matches HEAD (arena/01a0b25b-browserskill)
+OK: root scripts identical to skills/git-sync/scripts
+OK: no drive-style variable typos ($var:)
+== exits in Invoke-PollRound: 6
+OK: every exit path sets its closing summary
+== exits in Invoke-PollOnce: 2 (lock held / crashed / normal)
+OK: loop closing lines covered (6 exit paths, all with their own summary)
+OK: every .ps1 parses
+   (gate ran via E:\hermes\git\bin\bash.exe [git])
+== accept 2a: silent push PROVEN (ls-remote + push --dry-run, prompts disabled)
+== auth: this clone is PINNED to gh account 'mqgg5630-cyber' (other clones use the machine default)
+== accept 2b (fallback): one LONG-LIVED loop process - one brief flash per logon,
+   not per poll. For zero flash: admin PowerShell -> .\watch.ps1 -Unregister ;
+   .\watch.ps1 -Register -Headless   (or fix the launcher, see watch-*.log)
+== exits in Invoke-PollRound: 6
+OK: every exit path sets its closing summary
+== exits in Invoke-PollOnce: 2 (lock held / crashed / normal)
+OK: loop closing lines covered (6 exit paths, all with their own summary)
+== check_loop_summary PASSED
+== accept 2c: watcher closing lines verified (every exit path has its summary)
+== browser round: running code\bsk_arena_chat.ps1 (drives this machine's browser)
+== browser round (BrowserSkill)
+   task      : results/status/browser_task.json
+   url       : https://arena.ai/agent/01a0b237-fad1-7168-8115-d3f52e550489
+   send      : 168 chars
+   evidence  : deliverable\browser-loop
+   bsk       : C:\Users\文少\.local\bin\bsk.exe
+[FAIL] bsk status failed (exit -1). Start the daemon and connect the extension, then retry.
+[FAIL] accept 3: BrowserSkill round failed (exit 1)
+== accept 2d: hands-free auto_pull/auto_push present in watch.ps1
+== success criteria: results/status/success_criteria.json
+   BrowserSkill self-loop: the round only counts when the USER'S machine really drove its browser through bsk and produced evidence. The sandbox cannot fake these - result.json is written by code/bsk_arena_chat.ps1 on the Windows host.
+   FAIL MISSING file: deliverable/browser-loop/result.json
+   FAIL MISSING file: deliverable/browser-loop/transcript.md
+   FAIL MISSING file: deliverable/browser-loop/observe_before.txt
+   FAIL MISSING file: deliverable/browser-loop/observe_after.txt
+   FAIL MISSING file: deliverable/browser-loop/page.png
+   FAIL MISSING for contains: deliverable/browser-loop/result.json
+   FAIL MISSING for regex: deliverable/browser-loop/result.json
+   FAIL MISSING for regex: deliverable/browser-loop/transcript.md
+   FAIL MISSING for min_bytes: deliverable/browser-loop/result.json
+   FAIL MISSING for min_bytes: deliverable/browser-loop/page.png
