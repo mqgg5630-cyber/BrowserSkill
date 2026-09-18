@@ -24,6 +24,9 @@
 #   login_pattern       regex that marks a sign-in wall (localised wording)
 #   ready_timeout_sec   how long to wait for the app to render an input field
 #                       (single-page apps answer 'load' before painting)
+#   retry_pattern       observe line of an in-page recovery control to click
+#                       when the app rendered an error instead of the chat
+#   fallback_url        page to fall back to when the target never loads
 #
 # Evidence written to <out_dir>:
 #   result.json          machine-readable verdict (what success_criteria reads)
@@ -102,6 +105,8 @@ if ($null -ne $task.require_reply) { $requireReply = [bool]$task.require_reply }
 $borrowMatch    = [string]$task.borrow_tab_match
 $loginPattern   = if ($task.login_pattern) { [string]$task.login_pattern } else { '(?i)\b(sign in|log in)\b' }
 $readyTimeout   = if ($task.ready_timeout_sec) { [int]$task.ready_timeout_sec } else { 90 }
+$retryPattern   = if ($null -ne $task.retry_pattern) { [string]$task.retry_pattern } else { '(?i)button "(try again|retry|reload)' }
+$fallbackUrl    = [string]$task.fallback_url
 if (-not $OutDir) {
     $OutDir = if ($task.out_dir) { [string]$task.out_dir } else { 'deliverable/browser-loop' }
 }
@@ -305,6 +310,7 @@ $result = [ordered]@{
     session_id       = $sid
     url              = $url
     borrowed_tab_id  = $null
+    used_fallback    = $false
     message_sent     = $false
     message          = $message
     composer_ref     = ''
@@ -369,39 +375,89 @@ try {
         Add-Step 'navigate' 'ok' $url
     }
 
-    # A single-page app answers `load` long before it has painted anything:
-    # round 3 observed only the page shell plus a Grammarly overlay (325 chars)
-    # and concluded there was no composer. So poll the observation until a real
-    # input field shows up (or ready_timeout_sec runs out) instead of guessing
-    # a sleep duration.
-    $before = ''
-    $readyT0 = Get-Date
-    $sawField = $false
-    while ($true) {
-        $before = Get-Observation
-        if ($before) {
-            $sawField = ($before -match '(?i)\b(textbox|searchbox|combobox|textarea)\b')
-            if ($sawField -or -not $message -or $SkipSend) { break }
+    # A single-page app answers `load` long before it has painted anything
+    # (round 3: only the shell, 325 chars), and it can also render a hard
+    # error instead of the chat (round 4: "Something went wrong - We couldn't
+    # load this chat", with a Try again button). So: poll for a real input
+    # field, and when it never appears, try the page's own recovery controls
+    # before giving up.
+    function Wait-ForField {
+        param([int]$TimeoutSec)
+        $t0 = Get-Date
+        $txt = ''
+        while ($true) {
+            $txt = Get-Observation
+            if ($txt -and ($txt -match '(?i)\b(textbox|searchbox|combobox|textarea)\b')) {
+                return @{ text = $txt; found = $true; secs = [int]((Get-Date) - $t0).TotalSeconds }
+            }
+            if (((Get-Date) - $t0).TotalSeconds -ge $TimeoutSec) { break }
+            Start-Sleep -Seconds 3
         }
-        if (((Get-Date) - $readyT0).TotalSeconds -ge $readyTimeout) { break }
-        Start-Sleep -Seconds 3
+        return @{ text = $txt; found = $false; secs = [int]((Get-Date) - $t0).TotalSeconds }
     }
-    $readySec = [int]((Get-Date) - $readyT0).TotalSeconds
+
+    $needField = ($message -and -not $SkipSend)
+    $r = Wait-ForField -TimeoutSec $readyTimeout
+    $before = $r.text
+    $sawField = $r.found
+    Add-Step 'wait for the app to render' $(if ($sawField) { 'ok' } else { 'no input yet' }) `
+        ($r.secs.ToString() + 's, ' + ([string]$before).Length + ' chars')
+
+    # --- recovery pass 1: click the page's own retry control ("Try again")
+    if ($needField -and -not $sawField -and $retryPattern) {
+        foreach ($ln in ($before -split "`r?`n")) {
+            if ($ln -match $retryPattern -and $ln -match '@e(\d+)') {
+                $rref = '@e' + $Matches[1]
+                $rc = Invoke-Bsk -BskArgs @('click', $rref, '--session', $sid) -TimeoutSec 120
+                Add-Step 'click retry control' $(if ($rc.code -eq 0) { 'ok' } else { 'FAILED' }) ($rref + ' ' + $ln.Trim())
+                if ($rc.code -eq 0) {
+                    $r = Wait-ForField -TimeoutSec ([int]($readyTimeout / 2))
+                    $before = $r.text
+                    $sawField = $r.found
+                }
+                break
+            }
+        }
+    }
+
+    # --- recovery pass 2: a hard reload
+    if ($needField -and -not $sawField) {
+        $rl = Invoke-Bsk -BskArgs @('reload', '--session', $sid, '--hard', '--wait-until', 'load', '--timeout', '60s') -TimeoutSec 120
+        Add-Step 'hard reload' $(if ($rl.code -eq 0) { 'ok' } else { 'FAILED' }) 'the chat did not load the first time'
+        if ($rl.code -eq 0) {
+            $r = Wait-ForField -TimeoutSec ([int]($readyTimeout / 2))
+            $before = $r.text
+            $sawField = $r.found
+        }
+    }
+
+    # --- recovery pass 3: the fallback page (e.g. a fresh chat)
+    if ($needField -and -not $sawField -and $fallbackUrl) {
+        $nv = Invoke-Bsk -BskArgs @('navigate', $fallbackUrl, '--session', $sid, '--wait-until', 'load', '--timeout', '60s') -TimeoutSec 120
+        Add-Step 'fallback url' $(if ($nv.code -eq 0) { 'ok' } else { 'FAILED' }) $fallbackUrl
+        if ($nv.code -eq 0) {
+            $r = Wait-ForField -TimeoutSec $readyTimeout
+            $before = $r.text
+            $sawField = $r.found
+            if ($sawField) { $result.url = $fallbackUrl; $result.used_fallback = $true }
+        }
+    }
+
     if (-not $before) {
         Add-Step 'observe (before)' 'FAILED' 'empty observation'
         throw 'observe returned nothing - the page may not be controllable'
     }
     Write-Utf8NoBom (Join-Path $OutDir 'observe_before.txt') $before
-    Add-Step 'observe (before)' 'ok' ($before.Length.ToString() + ' chars after ' + $readySec + 's, input field: ' + $sawField)
+    Add-Step 'observe (before)' 'ok' (([string]$before).Length.ToString() + ' chars, input field: ' + $sawField)
 
     # When the app never rendered a field, save everything that helps diagnose
     # it from the sandbox: the accessibility snapshot and a screenshot.
-    if ($message -and -not $SkipSend -and -not $sawField) {
+    if ($needField -and -not $sawField) {
         $snap = Invoke-Bsk -BskArgs @('snapshot', '--session', $sid) -TimeoutSec 120
         if ($snap.out) { Write-Utf8NoBom (Join-Path $OutDir 'snapshot_stuck.txt') $snap.out }
         $stuckShot = Join-Path $OutDir 'page.png'
         $null = Invoke-Bsk -BskArgs @('screenshot', '--session', $sid, '--out', $stuckShot) -TimeoutSec 180
-        Add-Step 'page never rendered an input' 'DIAG' ('saved snapshot_stuck.txt + page.png after ' + $readySec + 's')
+        Add-Step 'page never rendered an input' 'DIAG' 'saved snapshot_stuck.txt + page.png'
     }
 
     # A login wall is the one thing this loop cannot fix by itself. The pattern

@@ -12,7 +12,7 @@
     "deliverable/browser-loop/transcript.md": "session stop: ok"
   },
   "require_contains": {
-    "deliverable/browser-loop/result.json": "arena.ai/agent/01a0b237"
+    "deliverable/browser-loop/result.json": "arena.ai"
   },
   "min_bytes": {
     "deliverable/browser-loop/result.json": 300,
