@@ -22,6 +22,9 @@
 #   borrow_tab_match    optional: borrow an already open user tab whose URL or
 #                       title matches this regex instead of navigating
 #   login_pattern       regex that marks a sign-in wall (localised wording)
+#   round_budget_sec    HARD wall-clock cap for the whole round (default 900).
+#                       A round must always finish well inside the watcher's
+#                       check_timeout_min, or no verdict is ever pushed.
 #   ready_timeout_sec   how long to wait for the app to render an input field
 #                       (single-page apps answer 'load' before painting)
 #   retry_pattern       observe line of an in-page recovery control to click
@@ -49,6 +52,20 @@ Set-Location (Join-Path $PSScriptRoot '..')   # repo root (this file lives in co
 
 $script:Fail = 0
 $script:Notes = New-Object System.Collections.ArrayList
+# Hard wall-clock deadline for the WHOLE round. Round 5 (2026-09-18) never
+# came back: the recovery passes stacked their own timeouts and the round
+# outlived the watcher's check_timeout_min, so no verdict was ever pushed and
+# the loop stalled. Every wait below is clamped to what is left of this budget.
+$script:RoundStart = Get-Date
+$script:RoundBudgetSec = 900
+function Get-RemainingSec {
+    $left = $script:RoundBudgetSec - [int]((Get-Date) - $script:RoundStart).TotalSeconds
+    if ($left -lt 5) { return 5 }
+    return $left
+}
+function Test-RoundExpired {
+    return (((Get-Date) - $script:RoundStart).TotalSeconds -ge $script:RoundBudgetSec)
+}
 
 function Say {
     param([string]$Text)
@@ -105,6 +122,7 @@ if ($null -ne $task.require_reply) { $requireReply = [bool]$task.require_reply }
 $borrowMatch    = [string]$task.borrow_tab_match
 $loginPattern   = if ($task.login_pattern) { [string]$task.login_pattern } else { '(?i)\b(sign in|log in)\b' }
 $readyTimeout   = if ($task.ready_timeout_sec) { [int]$task.ready_timeout_sec } else { 90 }
+if ($task.round_budget_sec) { $script:RoundBudgetSec = [int]$task.round_budget_sec }
 $retryPattern   = if ($null -ne $task.retry_pattern) { [string]$task.retry_pattern } else { '(?i)button "(try again|retry|reload)' }
 $fallbackUrl    = [string]$task.fallback_url
 if (-not $OutDir) {
@@ -150,6 +168,10 @@ function Invoke-Bsk {
     # drive System.Diagnostics.Process directly: it gives the real exit code
     # and both streams, and it never needs a temp file.
     param([string[]]$BskArgs, [int]$TimeoutSec = 180)
+
+    # never let one command outlive the round budget
+    $left = Get-RemainingSec
+    if ($TimeoutSec -gt $left) { $TimeoutSec = $left }
 
     $res = @{ code = 1; out = ''; err = ''; how = 'process' }
     $psi = New-Object System.Diagnostics.ProcessStartInfo
@@ -311,6 +333,8 @@ $result = [ordered]@{
     url              = $url
     borrowed_tab_id  = $null
     used_fallback    = $false
+    round_budget_sec = $script:RoundBudgetSec
+    elapsed_sec      = 0
     message_sent     = $false
     message          = $message
     composer_ref     = ''
@@ -391,6 +415,7 @@ try {
                 return @{ text = $txt; found = $true; secs = [int]((Get-Date) - $t0).TotalSeconds }
             }
             if (((Get-Date) - $t0).TotalSeconds -ge $TimeoutSec) { break }
+            if (Test-RoundExpired) { break }
             Start-Sleep -Seconds 3
         }
         return @{ text = $txt; found = $false; secs = [int]((Get-Date) - $t0).TotalSeconds }
@@ -514,6 +539,10 @@ try {
         $stableSince = $null
         $after = $before
         while (((Get-Date) - $t0).TotalSeconds -lt $replyTimeout) {
+            if (Test-RoundExpired) {
+                Add-Step 'wait for reply' 'BUDGET' 'round budget reached - stopping the wait'
+                break
+            }
             Start-Sleep -Seconds 5
             $now = Get-Observation
             if (-not $now) { continue }
@@ -586,6 +615,8 @@ try {
 }
 
 $result.finished_utc = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+$result.elapsed_sec = [int]((Get-Date) - $script:RoundStart).TotalSeconds
+Say ('== round elapsed: ' + $result.elapsed_sec + 's (budget ' + $script:RoundBudgetSec + 's)')
 
 # ---------------------------------------------------------------- 8. evidence
 $json = ($result | ConvertTo-Json -Depth 8)

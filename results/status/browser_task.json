@@ -5,14 +5,16 @@
   "message": "BrowserSkill self-loop round 1: this message was typed by the bsk CLI driving the real browser (not by a human). Please reply with the single line: BROWSERSKILL-LOOP-OK",
   "composer_hint": "",
   "send_key": "Enter",
-  "reply_timeout_sec": 240,
+  "reply_timeout_sec": 180,
   "settle_sec": 8,
   "require_reply": true,
   "out_dir": "deliverable/browser-loop",
   "borrow_tab_match": "arena\\.ai/agent/01a0b237",
-  "ready_timeout_sec": 120,
+  "ready_timeout_sec": 90,
   "_comment2": "ready_timeout_sec: arena.ai is a single-page app; round 3 saw only the shell 3s after load.",
   "fallback_url": "https://arena.ai/",
   "retry_pattern": "(?i)button \"(try again|retry|reload)",
-  "_comment3": "round 4: the target chat answered \"Something went wrong - We couldn't load this chat\" with a Try again button. The runner now clicks it, then hard-reloads, then falls back to fallback_url."
+  "_comment3": "round 4: the target chat answered \"Something went wrong - We couldn't load this chat\" with a Try again button. The runner now clicks it, then hard-reloads, then falls back to fallback_url.",
+  "round_budget_sec": 600,
+  "_comment4": "round 5 hung past the watcher's 30-min check timeout, so no verdict came back. The runner now has a hard 600s budget and every wait is clamped to it."
 }
