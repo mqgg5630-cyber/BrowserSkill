@@ -134,34 +134,107 @@ if (-not $bsk) {
 Say ('   bsk       : ' + $bsk)
 
 function Invoke-Bsk {
-    # runs bsk and returns @{ code; out; err }
+    # Runs bsk and returns @{ code; out; err }.
+    #
+    # Round 2 on LAPTOP-R77M5D6M returned "exit -1" with EMPTY stdout AND
+    # stderr from Start-Process -PassThru (ExitCode came back null, nothing was
+    # written to the redirect files). A verdict with no message is useless, so
+    # drive System.Diagnostics.Process directly: it gives the real exit code
+    # and both streams, and it never needs a temp file.
     param([string[]]$BskArgs, [int]$TimeoutSec = 180)
-    $outFile = [System.IO.Path]::GetTempFileName()
-    $errFile = [System.IO.Path]::GetTempFileName()
-    $res = @{ code = 1; out = ''; err = '' }
-    try {
-        $p = Start-Process -FilePath $bsk -ArgumentList $BskArgs -NoNewWindow -PassThru `
-                -RedirectStandardOutput $outFile -RedirectStandardError $errFile
-        if (-not $p.WaitForExit($TimeoutSec * 1000)) {
-            $null = cmd /c ('taskkill /F /T /PID ' + $p.Id + ' 2>&1')
-            try { $null = $p.WaitForExit(10000) } catch { }
-            $res.err = 'timed out after ' + $TimeoutSec + 's'
-            $res.code = 124
-        } else {
-            $ec = $p.ExitCode
-            if ($null -eq $ec) { $ec = -1 }
-            $res.code = [int]$ec
+
+    $res = @{ code = 1; out = ''; err = ''; how = 'process' }
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $bsk
+    # PS 5.1 runs on .NET Framework, where ProcessStartInfo has NO ArgumentList
+    # (that is .NET Core 2.1+). Use it when present, otherwise build the single
+    # Arguments string with Windows' own quoting rules.
+    $useList = $false
+    try { if ($null -ne $psi.ArgumentList) { $useList = $true } } catch { $useList = $false }
+    if ($useList) {
+        foreach ($a in $BskArgs) { [void]$psi.ArgumentList.Add([string]$a) }
+    } else {
+        $parts = @()
+        foreach ($a in $BskArgs) {
+            $v = [string]$a
+            # escape backslashes that precede the closing quote, then the quotes
+            $v = $v -replace '(\\+)$', '$1$1'
+            $v = $v -replace '"', '\"'
+            $parts += ('"' + $v + '"')
         }
-    } catch {
-        $res.err = $_.Exception.Message
-        $res.code = -1
+        $psi.Arguments = ($parts -join ' ')
     }
-    foreach ($pair in @(@('out', $outFile), @('err', $errFile))) {
-        $t = Get-Content -LiteralPath $pair[1] -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
-        if ($t) {
-            if ($res[$pair[0]]) { $res[$pair[0]] = $res[$pair[0]] + "`n" + $t } else { $res[$pair[0]] = $t }
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.CreateNoWindow = $true
+    $psi.WorkingDirectory = (Get-Location).Path
+    # The page and the CLI both speak UTF-8; PS 5.1 would otherwise decode the
+    # JSON in the console code page and mangle every non-ASCII reply.
+    try {
+        $psi.StandardOutputEncoding = New-Object System.Text.UTF8Encoding($false)
+        $psi.StandardErrorEncoding  = New-Object System.Text.UTF8Encoding($false)
+    } catch { }
+    $psi.EnvironmentVariables['BSK_AUTO_START'] = '0'
+
+    $proc = $null
+    try {
+        $proc = New-Object System.Diagnostics.Process
+        $proc.StartInfo = $psi
+        [void]$proc.Start()
+        # Read both streams asynchronously: reading one to the end first can
+        # deadlock when the other fills its pipe buffer.
+        $tOut = $proc.StandardOutput.ReadToEndAsync()
+        $tErr = $proc.StandardError.ReadToEndAsync()
+        if (-not $proc.WaitForExit($TimeoutSec * 1000)) {
+            try { $null = cmd /c ('taskkill /F /T /PID ' + $proc.Id + ' 2>&1') } catch { }
+            try { $null = $proc.WaitForExit(10000) } catch { }
+            $res.code = 124
+            $res.err = 'timed out after ' + $TimeoutSec + 's'
+        } else {
+            $res.code = [int]$proc.ExitCode
         }
-        Remove-Item -LiteralPath $pair[1] -Force -ErrorAction SilentlyContinue
+        try { $res.out = [string]$tOut.Result } catch { }
+        try { $res.err = ([string]$res.err + [string]$tErr.Result).Trim() } catch { }
+    } catch {
+        $res.code = -1
+        $res.err = 'could not start ' + $bsk + ': ' + $_.Exception.Message
+        $res.how = 'start-failed'
+    } finally {
+        if ($proc) { try { $proc.Dispose() } catch { } }
+    }
+
+    # A -1 / empty-everything result means the .NET path told us nothing.
+    # cmd.exe redirection is the mechanism watch.ps1 already relies on in the
+    # field, so use it as the fallback rather than reporting a blank failure.
+    if ($res.code -eq -1 -and -not $res.out -and -not $res.err) {
+        $outFile = [System.IO.Path]::GetTempFileName()
+        $errFile = [System.IO.Path]::GetTempFileName()
+        $codeFile = [System.IO.Path]::GetTempFileName()
+        $quoted = @('"' + $bsk + '"')
+        foreach ($a in $BskArgs) { $quoted += ('"' + ([string]$a).Replace('"', '\"') + '"') }
+        $line = '"' + ($quoted -join ' ') + ' > "' + $outFile + '" 2> "' + $errFile + '" & echo !ERRORLEVEL! > "' + $codeFile + '""'
+        $cmdExe = if ($env:ComSpec) { $env:ComSpec } else { 'cmd.exe' }
+        try {
+            $p2 = Start-Process -FilePath $cmdExe -ArgumentList @('/v:on', '/d', '/c', $line) `
+                    -WorkingDirectory (Get-Location).Path -NoNewWindow -PassThru
+            if (-not $p2.WaitForExit($TimeoutSec * 1000)) {
+                try { $null = cmd /c ('taskkill /F /T /PID ' + $p2.Id + ' 2>&1') } catch { }
+            }
+        } catch { }
+        $rawCode = (Get-Content -LiteralPath $codeFile -Raw -ErrorAction SilentlyContinue)
+        if ($rawCode) {
+            $rawCode = ($rawCode -replace '[^0-9-]', '')
+            if ($rawCode -match '^-?\d+$') { $res.code = [int]$rawCode }
+        }
+        $t = Get-Content -LiteralPath $outFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+        if ($t) { $res.out = $t }
+        $t = Get-Content -LiteralPath $errFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+        if ($t) { $res.err = $t }
+        $res.how = 'cmd-fallback'
+        foreach ($f in @($outFile, $errFile, $codeFile)) {
+            Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue
+        }
     }
     return $res
 }
@@ -184,8 +257,13 @@ function Get-BskJson {
 # ---------------------------------------------------------------- 2. daemon + browser
 $st = Get-BskJson -BskArgs @('status', '--json') -TimeoutSec 60
 if ($st.code -ne 0 -or $null -eq $st.json) {
-    Fail-Round ('bsk status failed (exit ' + $st.code + '). Start the daemon and connect the extension, then retry.')
+    Fail-Round ('bsk status failed (exit ' + $st.code + ', via ' + $st.how + '). Start the daemon and connect the extension, then retry.')
+    if ($st.out) { Say ('       stdout: ' + ($st.out.Trim())) }
     if ($st.err) { Say ('       stderr: ' + ($st.err.Trim())) }
+    if (-not $st.out -and -not $st.err) {
+        Say '       (the CLI produced no output at all - run this by hand in the same account:'
+        Say ('        "' + $bsk + '" status --json)')
+    }
     exit 1
 }
 $browsers = @($st.json.browsers)
