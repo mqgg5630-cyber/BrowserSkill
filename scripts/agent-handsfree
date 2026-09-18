@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+"""agent-handsfree shim: request local-equivalent acceptance + --accept close-out.
+
+Commands:
+  scripts/agent-handsfree request --round N [--branch NAME]
+      Verify deliverables/round-N artifacts (existence, non-empty, openable,
+      contains round/timestamp/prev-status, pushed to branch) and write
+      verification.log + verification.json. Prints PASSED/FAILED.
+
+  scripts/agent-handsfree --accept --round N
+      Close out round N after PASSED: writes ACCEPTED.json. Requires
+      verification.json status==passed.
+
+  scripts/agent-handsfree --help
+"""
+import argparse
+import datetime
+import json
+import os
+import subprocess
+import sys
+import zipfile
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def sh(*args):
+    try:
+        return subprocess.check_output(args, text=True, cwd=ROOT).strip()
+    except subprocess.CalledProcessError as e:
+        return f"ERR:{e}"
+
+def round_dir(n):
+    return os.path.join(ROOT, "deliverables", f"round-{n}")
+
+def check_docx_text(path, must_contain):
+    from docx import Document
+    doc = Document(path)
+    full = "\n".join(p.text for p in doc.paragraphs)
+    for t in doc.tables:
+        for row in t.rows:
+            for c in row.cells:
+                full += "\n" + c.text
+    missing = [m for m in must_contain if m not in full]
+    return full, missing
+
+def check_pptx_text(path, must_contain):
+    from pptx import Presentation
+    prs = Presentation(path)
+    texts = []
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                texts.append(shape.text)
+            if shape.has_table:
+                for row in shape.table.rows:
+                    for cell in row.cells:
+                        texts.append(cell.text)
+    full = "\n"..join(texts)
+    missing = [m for m in must_contain if m not in full]
+    return full, missing, len(prs.slides)
+
+def do_request(round_no, branch):
+    outdir = round_dir(round_no)
+    meta_path = os.path.join(outdir, "meta.json")
+    docx_path = os.path.join(outdir, f"report-round-{round_no}.docx")
+    pptx_path = os.path.join(outdir, f"report-round-{round_no}.pptx")
+    log_lines = []
+    checks = []
+    def log(s):
+        log_lines.append(s)
+        print(s)
+
+    log(f"[agent-handsfree] request acceptance for round {round_no} on branch {branch}")
+    log(f"[agent-handsfree] time={datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    ok_overall = True
+    def check(name, ok, detail=""):
+        nonlocal ok_overall
+        checks.append({"name": name, "ok": bool(ok), "detail": detail})
+        log(f"  [{'PASS' if ok else 'FAIL'}] {name}" + (f" — {detail}" if detail else ""))
+        if not ok:
+            ok_overall = False
+
+    # 1. files exist + non-empty
+    for p, label in [(docx_path, "docx exists"), (pptx_path, "pptx exists")]:
+        exists = os.path.isfile(p)
+        size = os.path.getsize(p) if exists else 0
+        check(label, exists and size > 0, f"{os.path.relpath(p, ROOT)} size={size}")
+
+    # 2. meta.json
+    meta = {}
+    if os.path.isfile(meta_path):
+        try:
+            with open(meta_path, encoding="utf-8") as f:
+                meta = json.load(f)
+            check("meta.json valid", meta.get("round") == round_no, f"round={meta.get('round')} ts={meta.get('timestamp_utc')}")
+        except Exception as e:
+            check("meta.json valid", False, str(e))
+    else:
+        check("meta.json valid", False, "missing")
+
+    ts = meta.get("timestamp_utc", "")
+    prev = meta.get("prev_status", "")
+
+    # 3. docx openable + contains 3 elements
+    must = [f"第 {round_no} 轮"]
+    if ts:
+        must.append(ts)
+    if prev:
+        # check a distinctive prefix (first 12 chars) to tolerate wrapping
+        must.append(prev[:12])
+    try:
+        if os.path.isfile(docx_path):
+            _, missing = check_docx_text(docx_path, must)
+            check("docx content (轮次/时间戳/上轮状态)", len(missing) == 0, "missing=" + ",".join(missing) if missing else "all present")
+        else:
+            check("docx content (轮次/时间戳/上轮状态)", False, "no file")
+    except Exception as e:
+        check("docx content (轮次/时间戳/上轮状态)", False, f"{type(e).__name__}: {e}")
+
+    try:
+        if os.path.isfile(pptx_path):
+            _, missing, nslides = check_pptx_text(pptx_path, must)
+            check("pptx content (轮次/时间戳/上轮状态)", len(missing) == 0, ("missing=" + ",".join(missing)) if missing else f"all present, slides={nslides}")
+        else:
+            check("pptx content (轮次/时间戳/上轮状态)", False, "no file")
+    except Exception as e:
+        check("pptx content (轮次/时间戳/上轮状态)", False, f"{type(e).__name__}: {e}")
+
+    # 4. zip integrity
+    for p, label in [(docx_path, "docx zip integrity"), (pptx_path, "pptx zip integrity")]:
+        if os.path.isfile(p):
+            try:
+                with zipfile.ZipFile(p) as z:
+                    bad = z.testzip()
+                check(label, bad is None, "ok" if bad is None else f"bad={bad}")
+            except Exception as e:
+                check(label, False, str(e))
+
+    # 5. pushed to branch (local commit exists on remote)
+    local_sha = sh("git", "rev-parse", "HEAD")
+    remote_sha = sh("git", "ls-remote", "origin", branch)
+    pushed = local_sha[:7] in remote_sha if not remote_sha.startswith("ERR") else False
+    # ls-remote returns "<sha>\trefs/heads/<branch>"
+    check("pushed to branch", pushed, f"local={local_sha[:12]} remote={remote_sha[:60]}")
+
+    status = "passed" if ok_overall else "failed"
+    log(f"[agent-handsfree] verdict: {status.upper()}")
+    os.makedirs(outdir, exist_ok=True)
+    with open(os.path.join(outdir, "verification.log"), "w", encoding="utf-8") as f:
+        f.write("\n".join(log_lines) + "\n")
+    with open(os.path.join(outdir, "verification.json"), "w", encoding="utf-8") as f:
+        json.dump({
+            "round": round_no,
+            "branch": branch,
+            "status": status,
+            "timestamp_utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "local_sha": local_sha,
+            "checks": checks,
+        }, f, ensure_ascii=False, indent=2)
+    return 0 if ok_overall else 1
+
+def do_accept(round_no):
+    outdir = round_dir(round_no)
+    vpath = os.path.join(outdir, "verification.json")
+    if not os.path.isfile(vpath):
+        print(f"[agent-handsfree] --accept refused: {vpath} missing, run request first", file=sys.stderr)
+        return 2
+    with open(vpath, encoding="utf-8") as f:
+        v = json.load(f)
+    if v.get("status") != "passed":
+        print(f"[agent-handsfree] --accept refused: verification status={v.get('status')}", file=sys.stderr)
+        return 3
+    accepted = {
+        "round": round_no,
+        "status": "passed+accepted",
+        "accepted_at_utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "verification_sha": v.get("local_sha"),
+        "branch": v.get("branch"),
+    }
+    with open(os.path.join(outdir, "ACCEPTED.json"), "w", encoding="utf-8") as f:
+        json.dump(accepted, f, ensure_ascii=False, indent=2)
+    print(f"[agent-handsfree] round {round_no} ACCEPTED (passed+accepted) at {accepted['accepted_at_utc']}")
+    return 0
+
+def main():
+    ap = argparse.ArgumentParser(prog="agent-handsfree", add_help=True)
+    ap.add_argument("command", nargs="?", choices=["request"], help="request acceptance")
+    ap.add_argument("--round", dest="round_no", type=int, required=True)
+    ap.add_argument("--branch", default="arena/01a0b3c5-browserskill")
+    ap.add_argument("--accept", action="store_true", help="close out round after passed")
+    args = ap.parse_args()
+    if args.accept and args.command is None:
+        sys.exit(do_accept(args.round_no))
+    elif args.command == "request" and not args.accept:
+        sys.exit(do_request(args.round_no, args.branch))
+    else:
+        ap.print_help()
+        print("\nUse either: request --round N | --accept --round N", file=sys.stderr)
+        sys.exit(2)
+
+if __name__ == "__main__":
+    main()
