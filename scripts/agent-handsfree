@@ -55,7 +55,7 @@ def check_pptx_text(path, must_contain):
                 for row in shape.table.rows:
                     for cell in row.cells:
                         texts.append(cell.text)
-    full = "\n"..join(texts)
+    full = "\n".join(texts)
     missing = [m for m in must_contain if m not in full]
     return full, missing, len(prs.slides)
 
