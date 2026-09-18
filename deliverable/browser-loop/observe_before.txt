@@ -1,0 +1,9 @@
+@vom 1
+@view 1043x910
+@layers 1 focus=L1
+L1 page
+  RootWebArea "Arena | Benchmark & Compare the Best AI Models"
+    alert
+    group "grammarly-integration"
+      StaticText "{\"mode\":\"full\",\"isActive\":true,\"isUserDisabled\":false}"
+@warning geometry incomplete: some page or frame content has no top-level coordinates.
