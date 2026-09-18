@@ -1,9 +1,9 @@
 {
-  "round": 4,
-  "arena_state": "awaiting_check",
-  "local_state": "pending",
-  "arena_updated": "2026-09-18 02:57:19",
-  "local_updated": null,
-  "host": "",
-  "note": "verify browser round 4"
+    "round":  4,
+    "arena_state":  "awaiting_check",
+    "local_state":  "failed",
+    "arena_updated":  "2026-09-18 02:57:19",
+    "local_updated":  "2026-09-18 11:00:54",
+    "host":  "LAPTOP-R77M5D6M",
+    "note":  "verify browser round 4"
 }
