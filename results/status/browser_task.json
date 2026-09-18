@@ -9,5 +9,7 @@
   "settle_sec": 8,
   "require_reply": true,
   "out_dir": "deliverable/browser-loop",
-  "borrow_tab_match": "arena\\.ai/agent/01a0b237"
+  "borrow_tab_match": "arena\\.ai/agent/01a0b237",
+  "ready_timeout_sec": 120,
+  "_comment2": "ready_timeout_sec: arena.ai is a single-page app; round 3 saw only the shell 3s after load."
 }
